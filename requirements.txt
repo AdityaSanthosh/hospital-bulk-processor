@@ -1,0 +1,25 @@
+# Core FastAPI
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+pydantic==2.5.0
+pydantic-settings==2.1.0
+python-dotenv==1.0.0
+
+# HTTP Client
+httpx==0.25.0
+python-multipart==0.0.6
+
+# Celery & Message Queue
+celery[redis]==5.3.4
+
+# Resilience Patterns
+tenacity==8.2.3
+pybreaker==1.0.2
+aiolimiter==1.1.0
+
+# Testing
+pytest==7.4.3
+pytest-asyncio==0.21.1
+pytest-cov==4.1.0
+pytest-mock==3.12.0
+faker==20.1.0
