@@ -213,7 +213,10 @@ class JobRepository:
             s.add(jm)
 
     def set_result(self, job_id: str, result: BulkCreateResponse) -> None:
-        serialized = result.model_dump_json()
+        # Store result as JSON, excluding None-valued fields so internal IDs
+        # and raw error strings (e.g. per-hospital `hospital_id` / `error_message`)
+        # are omitted from the persisted response.
+        serialized = result.model_dump_json(exclude_none=True)
         with session_scope() as s:
             jm = s.get(JobModel, job_id)
             if not jm:

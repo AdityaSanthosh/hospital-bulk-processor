@@ -23,6 +23,13 @@ class Settings(BaseSettings):
     max_csv_rows: int = 20
     max_file_size_mb: int = 5
 
+    # SQLite (job storage)
+    # Default points to a relative file in the project root. Override with the
+    # environment variable SQLITE_DB_URL if you want an absolute path or different location.
+    # Example (relative): SQLITE_DB_URL="sqlite:///./jobs.db"
+    # Example (absolute): SQLITE_DB_URL="sqlite:////absolute/path/to/jobs.db"
+    sqlite_db_url: str = "sqlite:///./jobs.db"
+
     # Celery
     celery_broker_url: str = "redis://localhost:6379/0"
     celery_result_backend: str | None = (

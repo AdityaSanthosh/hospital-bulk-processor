@@ -154,7 +154,8 @@ async def _process_hospitals_async(job_id: str, hospitals_data: List[dict]):
                 f"PATCH /batch/{batch_id}/activate"
             )
 
-        return bulk_response.model_dump()
+        # Exclude per-hospital None fields (like error_message) from the serialized response
+        return bulk_response.model_dump(exclude_none=True)
 
     except Exception as e:
         error_msg = f"Error processing hospitals: {str(e)}"
@@ -189,25 +190,19 @@ async def _create_single_hospital(
         if hospital:
             return HospitalProcessingResult(
                 row=hospital_data.row_number,
-                hospital_id=hospital.id,
                 name=hospital_data.name,
                 status="created",  # Will be updated to "created_and_activated" if auto-activation succeeds
-                error_message=None,
             )
         else:
             return HospitalProcessingResult(
                 row=hospital_data.row_number,
-                hospital_id=None,
                 name=hospital_data.name,
                 status="failed",
-                error_message=error,
             )
     except Exception as e:
         logger.exception(f"Unexpected error creating hospital '{hospital_data.name}'")
         return HospitalProcessingResult(
             row=hospital_data.row_number,
-            hospital_id=None,
             name=hospital_data.name,
             status="failed",
-            error_message=f"Unexpected error: {str(e)}",
         )

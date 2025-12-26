@@ -1,5 +1,6 @@
 """Resilience: Retry, Circuit Breaker, Rate Limiting"""
 
+import asyncio
 import logging
 from functools import wraps
 from typing import Callable, Optional
@@ -128,12 +129,32 @@ class APICircuitBreaker:
         )
 
     def __call__(self, func: Callable) -> Callable:
-        """Decorator for circuit breaker"""
+        """Decorator for circuit breaker
+
+        Note: pybreaker has an async helper that depends on tornado. To avoid
+        that dependency and to work correctly inside asyncio-based Celery workers,
+        we call the synchronous `breaker.call` inside a thread and, if the wrapped
+        function is a coroutine function, run it in a fresh event loop within that
+        thread using `asyncio.run`. This preserves circuit-breaker semantics while
+        avoiding tornado.
+        """
 
         @wraps(func)
         async def wrapper(*args, **kwargs):
             try:
-                return await self.breaker.call_async(func, *args, **kwargs)  # type: ignore[misc]
+
+                def sync_runner():
+                    # If the target is async, run it in a fresh event loop inside
+                    # this thread. Running the coroutine via asyncio.run here is safe
+                    # because it executes in the worker thread created by to_thread.
+                    if asyncio.iscoroutinefunction(func):
+                        return asyncio.run(func(*args, **kwargs))
+                    else:
+                        return func(*args, **kwargs)
+
+                # Run the blocking breaker.call in a thread so it doesn't block the
+                # asyncio event loop. breaker.call will manage counters/state.
+                return await asyncio.to_thread(lambda: self.breaker.call(sync_runner))
             except CircuitBreakerError:
                 logger.error(
                     f"Circuit breaker '{self.name}' is OPEN for {func.__name__}"

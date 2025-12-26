@@ -41,10 +41,8 @@ class HospitalProcessingResult(BaseModel):
     """Result of processing a single hospital"""
 
     row: int
-    hospital_id: Optional[int] = None
     name: str
     status: str  # "created", "created_and_activated", "failed"
-    error_message: Optional[str] = None
 
 
 class BulkCreateResponse(BaseModel):

@@ -153,9 +153,22 @@ class JobService:
 
         all_jobs = job_repository.get_all()
 
-        # Convert to summaries
+        # Normalize datetimes to timezone-aware UTC before building summaries.
+        # This avoids comparisons between offset-naive and offset-aware datetimes.
+        def _ensure_aware_utc(dt):
+            if dt is None:
+                return None
+            if dt.tzinfo is None:
+                # Treat naive datetimes as UTC
+                return dt.replace(tzinfo=timezone.utc)
+            # Convert any aware datetime to UTC
+            return dt.astimezone(timezone.utc)
+
         job_summaries = []
         for job_id, job in all_jobs.items():
+            started_at = _ensure_aware_utc(job.started_at)
+            completed_at = _ensure_aware_utc(job.completed_at)
+
             summary = JobSummary(
                 job_id=job.job_id,
                 status=job.status,
@@ -163,8 +176,8 @@ class JobService:
                 processed_hospitals=job.processed_hospitals,
                 failed_hospitals=job.failed_hospitals,
                 progress_percentage=job.progress_percentage,
-                started_at=job.started_at,
-                completed_at=job.completed_at,
+                started_at=started_at,
+                completed_at=completed_at,
                 processing_time_seconds=job.processing_time_seconds,
             )
             job_summaries.append(summary)
