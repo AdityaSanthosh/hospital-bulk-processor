@@ -9,7 +9,6 @@ from io import BytesIO
 import pytest
 
 
-
 @pytest.mark.integration
 class TestHealthEndpoints:
     """Test health and info endpoints"""

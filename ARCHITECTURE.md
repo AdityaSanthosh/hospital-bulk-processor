@@ -99,11 +99,16 @@
 
 #### Retry Policy
 ```python
-@RetryPolicy.with_retry(max_attempts=3)  # Exponential backoff
+from tenacity import retry, stop_after_attempt, wait_exponential
+
+@retry(
+    stop=stop_after_attempt(3),
+    wait=wait_exponential(min=2, max=8),
+)  # Exponential backoff using tenacity
 ```
-- Retries transient failures
+- Retries transient failures using [tenacity](https://github.com/jd/tenacity)
 - Exponential backoff: 2s → 4s → 8s
-- Only retries specific exceptions
+- Configurable retry conditions and exception types
 
 ### 2. **Idempotency** (`app/core/idempotency.py`)
 
@@ -117,7 +122,7 @@ curl -H "Idempotency-Key: unique-123" ...
 - In-memory store with TTL (24 hours default)
 - Auto-generated if not provided
 
-### 3. **Celery Integration** (`app/infrastructure/celery/`)
+### 3. **Celery Integration** (`app/tasks/`)
 
 ```python
 # Task submission
@@ -130,7 +135,7 @@ celery -A celery_worker.celery_app worker
 - Redis as message broker and result backend
 - Task tracking and time limits
 
-### 4. **Repository Pattern** (`app/infrastructure/repositories/`)
+### 4. **Repository Pattern** (`app/repositories/`)
 
 ```python
 # Abstract data access
@@ -253,17 +258,18 @@ app/
 │   ├── schemas.py                  # Pydantic models
 │   └── exceptions.py               # Domain exceptions
 │
-├── application/                     # Use cases
+├── services/                        # Application services
 │   └── job_service.py              # Job orchestration
 │
-├── infrastructure/                  # External integrations
-│   ├── celery/
-│   │   ├── celery_app.py           # Celery configuration
-│   │   └── tasks.py                # Background tasks
-│   ├── external/
-│   │   └── hospital_api_client.py  # External API with resilience
-│   └── repositories/
-│       └── job_repository.py       # Data access
+├── tasks/                           # Background tasks (Celery)
+│   ├── celery_app.py               # Celery configuration
+│   └── tasks.py                    # Task definitions
+│
+├── external/                        # External API clients
+│   └── hospital_api_client.py      # Hospital API with resilience
+│
+├── repositories/                    # Data access layer
+│   └── job_repository.py           # Job repository (in-memory)
 │
 └── utils/
     └── csv_validator.py            # CSV validation

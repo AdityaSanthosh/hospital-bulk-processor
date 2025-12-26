@@ -1,462 +1,338 @@
-# Hospital Bulk Processor API
+# Hospital Bulk Processor API v2.0
 
-A FastAPI-based bulk processing system that integrates with the Hospital Directory API to handle CSV uploads and process hospital records concurrently.
+Production-ready FastAPI application for bulk processing hospital records with enterprise patterns.
 
-## 🚀 Features
+## 🏗️ Architecture
 
-- **Bulk CSV Upload**: Upload CSV files with up to 20 hospital records
-- **Concurrent Processing**: Process multiple hospitals simultaneously for optimal performance
-- **Batch Management**: Automatic batch creation and activation
-- **Error Handling**: Comprehensive validation and error reporting
-- **Rollback Support**: Automatic cleanup on failure
-- **Interactive API Documentation**: Swagger UI and ReDoc
+### Layered Architecture
+```
+├── Presentation Layer (API)
+│   └── app/api/v1/endpoints/
+├── Application Layer (Use Cases)
+│   └── app/services/
+├── Domain Layer (Business Logic)
+│   └── app/domain/
+├── Background Tasks
+│   └── app/tasks/
+├── External Integrations
+│   └── app/external/
+└── Data Access
+    └── app/repositories/
+```
 
-## 📋 Requirements
+### Key Features
 
-### Option 1: Docker (Recommended)
-- Docker 20.10+
-- Docker Compose 1.29+
+✅ **Celery Integration** - Distributed task processing with Redis  
+✅ **Rate Limiting** - Prevents overwhelming external APIs  
+✅ **Circuit Breaker** - Fails fast when external services are down  
+✅ **Retry Mechanism** - Exponential backoff for transient failures  
+✅ **Idempotency** - Safe retries with idempotency keys  
+✅ **API Versioning** - `/api/v1/` prefix for future compatibility  
+✅ **Layered Architecture** - Clean separation of concerns  
+✅ **Fail-Fast Publishing** - Immediate failure detection when Redis is down (1-2s, not 30s+)  
 
-### Option 2: Local Python
-- Python 3.8+
-- pip (Python package manager)
+## 🚀 Quick Start
 
-## 🛠️ Installation
+### Prerequisites
+- Python 3.10+
+- Redis (for Celery)
 
-### Option 1: Docker (Recommended)
+### Installation
 
-Docker provides the easiest way to run the application with all dependencies included.
-
-1. **Navigate to the project directory:**
-   ```bash
-   cd hospital-bulk-processor
-   ```
-
-2. **Build and run with Docker Compose:**
-   ```bash
-   docker-compose up --build
-   ```
-
-   Or use the provided script:
-   ```bash
-   ./docker-build.sh
-   docker-compose up
-   ```
-
-3. **Run in background (detached mode):**
-   ```bash
-   docker-compose up -d
-   ```
-
-4. **Using Make commands (optional):**
-   ```bash
-   make build    # Build the Docker image
-   make up       # Start in production mode
-   make dev      # Start in development mode (hot reload)
-   make logs     # View logs
-   make down     # Stop containers
-   make shell    # Open shell in container
-   ```
-
-### Option 2: Local Python Installation
-
-1. **Clone or navigate to the project directory:**
-   ```bash
-   cd hospital-bulk-processor
-   ```
-
-2. **Create a virtual environment:**
-   ```bash
-   python -m venv venv
-   ```
-
-3. **Activate the virtual environment:**
-   
-   - On macOS/Linux:
-     ```bash
-     source venv/bin/activate
-     ```
-   
-   - On Windows:
-     ```bash
-     venv\Scripts\activate
-     ```
-
-4. **Install dependencies:**
-   ```bash
-   pip install -r requirements.txt
-   ```
-
-5. **Configure environment variables (optional):**
-   ```bash
-   cp .env.example .env
-   ```
-   
-   Edit `.env` to customize settings if needed.
-
-## 🚦 Running the Application
-
-### With Docker (Recommended)
-
-**Production mode:**
+1. **Install dependencies**
 ```bash
-docker-compose up
+pip install -r requirements.txt
 ```
 
-**Development mode with hot reload:**
+2. **Start Redis**
 ```bash
-docker-compose -f docker-compose.dev.yml up
+# Using Docker
+docker run -d -p 6379:6379 redis:7-alpine
+
+# Or using Homebrew (macOS)
+brew install redis
+brew services start redis
 ```
 
-**Background mode:**
+3. **Configure environment**
 ```bash
-docker-compose up -d
+cp .env.example .env
+# Edit .env with your settings
 ```
 
-**Using Make:**
+4. **Start Celery worker**
 ```bash
-make up       # Production mode
-make dev      # Development mode
-make up-d     # Background mode
+celery -A celery_worker.celery_app worker --loglevel=info
 ```
 
-**Stop the application:**
+5. **Start FastAPI server**
 ```bash
-docker-compose down
-# or
-make down
+python app/main.py
+# Or
+uvicorn app.main:app --reload --port 8000
 ```
 
-### With Local Python
+## 📡 API Endpoints
 
-**Development Mode:**
-
+### Submit Bulk Upload
 ```bash
-uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+POST /api/v1/hospitals/bulk
 ```
 
-Or using Python:
-
+**Idempotency-Key header is REQUIRED:**
 ```bash
-python -m app.main
+# Generate UUID for idempotency key
+curl -X POST http://localhost:8000/api/v1/hospitals/bulk \
+     -H "Idempotency-Key: $(uuidgen)" \
+     -F "file=@hospitals.csv"
+
+# Or use your own unique key
+curl -X POST http://localhost:8000/api/v1/hospitals/bulk \
+     -H "Idempotency-Key: upload-2024-12-25-abc123" \
+     -F "file=@hospitals.csv"
 ```
 
-Or using the start script:
-
-```bash
-./start.sh
-```
-
-The API will be available at: `http://localhost:8000`
-
-### API Documentation
-
-Once the server is running, access the interactive documentation:
-
-- **Swagger UI**: http://localhost:8000/docs
-- **ReDoc**: http://localhost:8000/redoc
-
-## 📝 API Endpoints
-
-### Root Endpoint
-```
-GET /
-```
-Returns API information and available endpoints.
-
-### Health Check
-```
-GET /health
-```
-Returns the health status of the service.
-
-### Bulk Create Hospitals
-```
-POST /hospitals/bulk
-```
-
-Upload a CSV file to create multiple hospitals in bulk.
-
-**Request:**
-- Content-Type: `multipart/form-data`
-- Body: CSV file with hospital data
-
-**CSV Format:**
-```csv
-name,address,phone
-General Hospital,123 Main St,555-1234
-City Medical Center,456 Oak Ave,555-5678
-Community Health Clinic,789 Pine Rd,
-```
-
-**Required Columns:**
-- `name`: Hospital name (required)
-- `address`: Hospital address (required)
-- `phone`: Hospital phone number (optional)
-
-**Constraints:**
-- Maximum 20 hospitals per CSV
-- Maximum file size: 5MB
-- File must be UTF-8 encoded
-
-**Response Example:**
+**Response (202 Accepted):**
 ```json
 {
-  "batch_id": "550e8400-e29b-41d4-a716-446655440000",
-  "total_hospitals": 3,
-  "processed_hospitals": 3,
-  "failed_hospitals": 0,
-  "processing_time_seconds": 2.45,
-  "batch_activated": true,
-  "hospitals": [
-    {
-      "row": 2,
-      "hospital_id": 101,
-      "name": "General Hospital",
-      "status": "created_and_activated",
-      "error_message": null
-    },
-    {
-      "row": 3,
-      "hospital_id": 102,
-      "name": "City Medical Center",
-      "status": "created_and_activated",
-      "error_message": null
-    },
-    {
-      "row": 4,
-      "hospital_id": 103,
-      "name": "Community Health Clinic",
-      "status": "created_and_activated",
-      "error_message": null
-    }
-  ]
+  "job_id": "550e8400-e29b-41d4-a716-446655440000",
+  "status": "pending",
+  "message": "Job accepted and queued for processing...",
+  "total_hospitals": 10
 }
 ```
 
-## 🧪 Testing with cURL
+**Idempotency Behavior:**
+- Same key within 5 minutes → Returns cached response (no duplicate processing)
+- Different key with same CSV → Creates new job (business logic handles data duplicates)
+- Stored in Redis with 5-minute TTL
 
-### Upload a CSV file:
-
+### Get Job Status
 ```bash
-curl -X POST "http://localhost:8000/hospitals/bulk" \
-  -H "accept: application/json" \
-  -H "Content-Type: multipart/form-data" \
-  -F "file=@hospitals.csv"
+GET /api/v1/hospitals/status/{job_id}
 ```
 
-### Check health status:
-
+**Example:**
 ```bash
-curl -X GET "http://localhost:8000/health"
+curl http://localhost:8000/api/v1/hospitals/status/550e8400-e29b-41d4-a716-446655440000
 ```
 
-## 🧪 Testing with Python
+## 🔧 Configuration
 
+All configuration is in `app/config.py` and can be overridden via environment variables:
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `CELERY_BROKER_URL` | `redis://localhost:6379/0` | Redis URL for Celery |
+| `RATE_LIMIT_REQUESTS` | `10` | Max requests per period |
+| `RATE_LIMIT_PERIOD` | `1.0` | Period in seconds |
+| `RETRY_MAX_ATTEMPTS` | `3` | Max retry attempts |
+| `CIRCUIT_BREAKER_FAILURE_THRESHOLD` | `5` | Failures before opening circuit |
+| `CIRCUIT_BREAKER_RECOVERY_TIMEOUT` | `60` | Seconds before retry |
+
+## 🛡️ Resilience Patterns
+
+### Rate Limiting
+Prevents overwhelming the external Hospital API:
 ```python
-import requests
-
-# Upload CSV file
-with open('hospitals.csv', 'rb') as f:
-    files = {'file': ('hospitals.csv', f, 'text/csv')}
-    response = requests.post('http://localhost:8000/hospitals/bulk', files=files)
-    print(response.json())
+rate_limiter = RateLimiter(max_rate=10, time_period=1.0)
 ```
 
-## 📁 Project Structure
+### Circuit Breaker
+Fails fast when external API is down:
+```python
+@hospital_api_circuit_breaker
+async def create_hospital(...):
+    # Stops calling after 5 failures
+    # Retries after 60 seconds
+```
+
+### Retry with Exponential Backoff
+```python
+from tenacity import retry, stop_after_attempt, wait_exponential
+
+@retry(
+    stop=stop_after_attempt(3),
+    wait=wait_exponential(min=2, max=10),
+)
+async def create_hospital(...):
+    # Retries with exponential backoff
+    # Using tenacity library: https://github.com/jd/tenacity
+```
+
+### Idempotency (Mandatory)
+```bash
+# Required: Client must provide unique key per upload attempt
+curl -H "Idempotency-Key: $(uuidgen)" \
+     -F "file=@hospitals.csv" \
+     http://localhost:8000/api/v1/hospitals/bulk
+
+# Same key within 5 minutes = cached response (request deduplication)
+# Different key = new request (business logic handles data duplicates)
+```
+
+**Key Generation Examples:**
+```bash
+# UUID (recommended)
+uuidgen  # macOS/Linux
+# Or: python -c "import uuid; print(uuid.uuid4())"
+
+# Timestamp-based
+echo "upload-$(date +%s)-$(openssl rand -hex 4)"
+
+# Semantic
+echo "batch-user123-$(date +%Y%m%d%H%M%S)"
+```
+
+## 📊 Monitoring
+
+### Logs
+All operations are logged to console with structured format:
+```
+2024-01-15 10:30:15 - app.external.hospital_api_client - INFO - Hospital created successfully: General Hospital (ID: 101)
+2024-01-15 10:30:16 - app.core.resilience - WARNING - Circuit breaker 'hospital_api' state changed: closed -> open
+```
+
+### Health Check
+```bash
+curl http://localhost:8000/health
+```
+
+### Redis for Idempotency
+Idempotency keys are stored in Redis with 5-minute TTL:
+```bash
+# Check stored keys
+redis-cli KEYS "idempotency:*"
+
+# Check TTL for a key
+redis-cli TTL "idempotency:your-key-here"
+
+# Manual cleanup (if needed)
+redis-cli DEL "idempotency:your-key-here"
+```
+
+## 🚨 Redis Fail-Fast Behavior
+
+When Redis is unavailable, the application **fails immediately** (1-2 seconds) instead of retrying for 30+ seconds.
+
+### Behavior
+```
+Redis DOWN → Job submission fails fast (1-2s) → Returns 503 to user
+Redis UP   → Job queued successfully → Returns 202 Accepted
+```
+
+### Response When Redis is Down
+```json
+{
+  "detail": "Service temporarily unavailable. The message queue is currently down. Please try again later."
+}
+```
+**HTTP Status**: `503 Service Unavailable`
+
+### Configuration
+The fail-fast behavior is controlled by these settings in `.env`:
+
+```bash
+# Fail immediately when publishing (no retries)
+CELERY_TASK_PUBLISH_RETRY=false
+CELERY_TASK_PUBLISH_MAX_RETRIES=0
+
+# Fast timeouts for quick failure detection
+CELERY_REDIS_SOCKET_CONNECT_TIMEOUT=1
+CELERY_REDIS_SOCKET_TIMEOUT=2
+CELERY_REDIS_RETRY_ON_TIMEOUT=false
+```
+
+### Testing Fail-Fast Behavior
+```bash
+# 1. Stop Redis
+redis-cli shutdown
+
+# 2. Run test script
+python test_redis_failfast.py
+
+# 3. Observe immediate failure (1-2 seconds)
+# Expected: Job submission fails quickly with clear error
+
+# 4. Start Redis
+brew services start redis
+
+# 5. Test again - should succeed
+python test_redis_failfast.py
+```
+
+### Why Fail-Fast?
+- ✅ **Quick user feedback** - No long timeouts
+- ✅ **Clear error messages** - Users know to retry later
+- ✅ **No resource exhaustion** - Prevents retry loops
+- ✅ **Better UX** - Fast failures > slow timeouts
+
+📖 **Detailed documentation**: See [docs/REDIS_FAILFAST.md](docs/REDIS_FAILFAST.md)
+
+## 🧪 Testing
+
+```bash
+# Run tests
+pytest
+
+# With coverage
+pytest --cov=app tests/
+```
+
+## 📦 Project Structure
 
 ```
 hospital-bulk-processor/
 ├── app/
-│   ├── __init__.py          # Package initialization
-│   ├── main.py              # FastAPI application and endpoints
-│   ├── models.py            # Pydantic models for request/response
-│   ├── services.py          # Business logic and API client
-│   └── utils.py             # CSV validation and utilities
-├── Dockerfile               # Docker image definition
-├── docker-compose.yml       # Docker Compose configuration (production)
-├── docker-compose.dev.yml   # Docker Compose configuration (development)
-├── .dockerignore           # Docker ignore rules
-├── Makefile                # Make commands for Docker
-├── docker-build.sh         # Docker build script
-├── requirements.txt         # Python dependencies
-├── .env.example             # Example environment variables
-├── .gitignore              # Git ignore rules
-├── start.sh                # Local start script
-├── test_setup.py           # Setup verification script
-├── sample_hospitals.csv    # Sample CSV for testing
-└── README.md               # This file
+│   ├── __init__.py
+│   ├── main.py                    # FastAPI application
+│   ├── config.py                  # Configuration
+│   │
+│   ├── api/
+│   │   └── v1/
+│   │       └── endpoints/
+│   │           └── hospitals.py   # API endpoints
+│   │
+│   ├── core/
+│   │   ├── resilience.py         # Rate limiter, circuit breaker, retry
+│   │   └── idempotency.py        # Idempotency store
+│   │
+│   ├── domain/
+│   │   ├── schemas.py            # Pydantic models
+│   │   └── exceptions.py         # Domain exceptions
+│   │
+│   ├── services/
+│   │   └── job_service.py        # Job orchestration
+│   │
+│   ├── tasks/
+│   │   ├── celery_app.py         # Celery configuration
+│   │   └── tasks.py              # Celery tasks
+│   │
+│   ├── external/
+│   │   └── hospital_api_client.py  # External API client
+│   │
+│   ├── repositories/
+│   │   └── job_repository.py     # Job storage
+│   │
+│   └── utils/
+│       └── csv_validator.py      # CSV validation
+│
+├── celery_worker.py              # Celery worker entrypoint
+├── requirements.txt
+└── .env.example
 ```
 
-## ⚙️ Configuration
+## 🔄 Migration from v1.0
 
-Configuration is managed through environment variables. See `.env.example` for available options:
+The old code is backed up in `app_old/`. Key changes:
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `HOSPITAL_API_BASE_URL` | `https://hospital-directory.onrender.com` | Base URL of the Hospital Directory API |
-| `MAX_CSV_ROWS` | `20` | Maximum number of rows allowed in CSV |
-| `UPLOAD_MAX_SIZE_MB` | `5` | Maximum file size in MB |
-| `HOST` | `0.0.0.0` | Server host |
-| `PORT` | `8000` | Server port |
+- ✅ FastAPI `BackgroundTasks` → **Celery**
+- ✅ Custom `JobManager` → **Repository pattern**
+- ✅ Direct API calls → **Rate limiting + Circuit breaker + Retry**
+- ✅ No idempotency → **Idempotency keys**
+- ✅ Single file → **Layered architecture**
+- ✅ No versioning → **API v1**
 
-## 🔄 How It Works
+## 📝 License
 
-1. **CSV Upload**: User uploads a CSV file via the `/hospitals/bulk` endpoint
-2. **Validation**: System validates CSV format, headers, and content
-3. **Batch Creation**: A unique batch UUID is generated
-4. **Concurrent Processing**: All hospitals are created concurrently via the Hospital Directory API
-5. **Batch Activation**: If all hospitals are created successfully, the batch is activated
-6. **Rollback**: If any hospital fails or activation fails, the entire batch is deleted
-7. **Response**: Detailed results are returned including processing time and individual hospital statuses
-
-## 🛡️ Error Handling
-
-The API provides comprehensive error handling:
-
-- **400 Bad Request**: Invalid CSV format, missing required fields, or validation errors
-- **500 Internal Server Error**: Unexpected errors during processing
-
-All errors include detailed messages to help diagnose issues.
-
-## 🐳 Docker Commands Reference
-
-### Basic Commands
-
-```bash
-# Build the image
-docker-compose build
-
-# Start containers
-docker-compose up
-
-# Start in background
-docker-compose up -d
-
-# View logs
-docker-compose logs -f
-
-# Stop containers
-docker-compose down
-
-# Restart containers
-docker-compose restart
-
-# Open shell in container
-docker-compose exec app /bin/bash
-
-# Run tests in container
-docker-compose exec app python test_setup.py
-```
-
-### Using Make (Easier)
-
-```bash
-make build          # Build Docker image
-make up             # Start in production mode
-make up-d           # Start in background
-make dev            # Start in development mode (hot reload)
-make down           # Stop containers
-make restart        # Restart containers
-make logs           # View logs
-make shell          # Open shell in container
-make test           # Run tests
-make clean          # Clean up Docker resources
-make health         # Check service health
-make test-upload    # Test with sample CSV
-```
-
-## 🚀 Deployment
-
-### Deploy with Docker to Render
-
-1. Create a new Web Service on [Render](https://render.com)
-2. Connect your GitHub repository
-3. Configure the service:
-   - **Runtime**: Docker
-   - **Dockerfile Path**: `./Dockerfile`
-   - **Docker Command**: (leave empty, uses CMD from Dockerfile)
-4. Add environment variables in Render dashboard:
-   - `HOSPITAL_API_BASE_URL=https://hospital-directory.onrender.com`
-   - `MAX_CSV_ROWS=20`
-   - `PORT=8000` (Render provides this)
-5. Deploy!
-
-### Deploy without Docker to Render
-
-1. Create a new Web Service on [Render](https://render.com)
-2. Connect your GitHub repository
-3. Configure the service:
-   - **Build Command**: `pip install -r requirements.txt`
-   - **Start Command**: `uvicorn app.main:app --host 0.0.0.0 --port $PORT`
-4. Add environment variables in Render dashboard
-5. Deploy!
-
-## 📊 Performance
-
-- **Concurrent Processing**: Hospitals are processed concurrently using `asyncio.gather()` for optimal performance
-- **Expected Processing Time**: ~2-5 seconds for 20 hospitals (depends on external API response time)
-- **Async HTTP Client**: Uses `httpx` for efficient async HTTP operations
-
-## 🔐 Security Considerations
-
-- File size limits prevent DoS attacks
-- CSV validation prevents malicious input
-- UTF-8 encoding requirement prevents encoding attacks
-- CORS configured (adjust for production)
-
-## 📄 License
-
-This project is provided as-is for the Hospital Bulk Processing System task.
-
-## 🤝 Contributing
-
-This is a task-specific project. For improvements or bug fixes, please discuss with the project maintainer.
-
-## 🐛 Troubleshooting
-
-### Docker Issues
-
-**Port already in use:**
-```bash
-# Stop other services on port 8000 or change the port in docker-compose.yml
-docker-compose down
-```
-
-**Permission denied:**
-```bash
-# Make scripts executable
-chmod +x docker-build.sh start.sh
-```
-
-**Container fails to start:**
-```bash
-# Check logs
-docker-compose logs
-
-# Rebuild from scratch
-make rebuild
-```
-
-**Cannot connect to external API:**
-```bash
-# Check if the API is accessible
-curl https://hospital-directory.onrender.com/docs
-
-# Check container network
-docker-compose exec app ping hospital-directory.onrender.com
-```
-
-## 📞 Support
-
-For issues or questions:
-1. Check the API documentation at `/docs`
-2. Review error messages in the response
-3. Check server logs:
-   - Docker: `docker-compose logs -f` or `make logs`
-   - Local: Check terminal output
-4. Verify external API is accessible
-
----
-
-**Note**: This system integrates with the Hospital Directory API at `https://hospital-directory.onrender.com`. Ensure the external API is accessible for the system to function properly.
+MIT

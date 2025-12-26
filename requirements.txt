@@ -11,6 +11,7 @@ python-multipart==0.0.6
 
 # Celery & Message Queue
 celery[redis]==5.3.4
+redis==5.0.1
 
 # Resilience Patterns
 tenacity==8.2.3

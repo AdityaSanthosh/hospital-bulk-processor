@@ -1,4 +1,5 @@
 """FastAPI application with API versioning"""
+
 import logging
 from contextlib import asynccontextmanager
 
@@ -11,8 +12,7 @@ from app.config import settings
 
 # Configure logging
 logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
 logger = logging.getLogger(__name__)
 
@@ -26,13 +26,17 @@ async def lifespan(app: FastAPI):
     logger.info(f"API v1 prefix: {settings.api_v1_prefix}")
     logger.info(f"Hospital API: {settings.hospital_api_base_url}")
     logger.info(f"Celery broker: {settings.celery_broker_url}")
-    logger.info(f"Rate limit: {settings.rate_limit_requests} req/{settings.rate_limit_period}s")
+    logger.info(
+        f"Rate limit: {settings.rate_limit_requests} req/{settings.rate_limit_period}s"
+    )
     logger.info(f"Retry attempts: {settings.retry_max_attempts}")
-    logger.info(f"Circuit breaker threshold: {settings.circuit_breaker_failure_threshold}")
+    logger.info(
+        f"Circuit breaker threshold: {settings.circuit_breaker_failure_threshold}"
+    )
     logger.info("=" * 60)
-    
+
     yield
-    
+
     # Shutdown
     logger.info("Shutting down application...")
 
@@ -59,9 +63,7 @@ app.add_middleware(
 
 # Include v1 router
 app.include_router(
-    hospitals.router,
-    prefix=f"{settings.api_v1_prefix}/hospitals",
-    tags=["hospitals"]
+    hospitals.router, prefix=f"{settings.api_v1_prefix}/hospitals", tags=["hospitals"]
 )
 
 
@@ -86,6 +88,7 @@ async def root():
             "redoc": f"{settings.api_v1_prefix}/redoc",
             "bulk_upload": f"{settings.api_v1_prefix}/hospitals/bulk",
             "job_status": f"{settings.api_v1_prefix}/hospitals/status/{{job_id}}",
+            "all_jobs": f"{settings.api_v1_prefix}/hospitals/jobs",
             "health": "/health",
         },
     }
@@ -109,7 +112,9 @@ async def http_exception_handler(request, exc):
         status_code=exc.status_code,
         content={
             "detail": exc.detail,
-            "error_type": "validation_error" if exc.status_code == 400 else "server_error",
+            "error_type": "validation_error"
+            if exc.status_code == 400
+            else "server_error",
         },
     )
 
@@ -129,4 +134,5 @@ async def general_exception_handler(request, exc):
 
 if __name__ == "__main__":
     import uvicorn
+
     uvicorn.run("app.main:app", host=settings.host, port=settings.port, reload=True)

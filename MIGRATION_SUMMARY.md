@@ -89,8 +89,7 @@ curl -H "Idempotency-Key: unique-123" -F "file=@data.csv" \
   "job_id": "...",
   "status": "pending",
   "message": "...",
-  "total_hospitals": 10,
-  "idempotency_key": "abc123..."  // NEW
+  "total_hospitals": 10
 }
 ```
 
