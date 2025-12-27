@@ -1,0 +1,77 @@
+version: "3.8"
+
+# Docker Compose for local development
+# Services:
+#  - redis: broker for Celery
+#  - web: FastAPI app (built from the Dockerfile)
+#  - worker: Celery worker (runs tasks)
+#
+# Usage:
+#  - Build & start: docker-compose up --build
+#  - Stop: docker-compose down
+#
+# Notes:
+#  - The repository is mounted into /app so code changes are reflected without rebuilding.
+#  - The default broker URL points to the redis service below.
+#  - SQLite file (./jobs.db) will be created in the project root because the repo is mounted.
+#  - For a production-like setup, prefer separate images and an external managed Redis.
+
+services:
+  redis:
+    image: redis:7-alpine
+    container_name: hospital_redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: hospital_web
+    command: gunicorn -w 1 -k uvicorn.workers.UvicornWorker app.main:app --bind 0.0.0.0:8000
+    # You can replace the command above with:
+    # command: uvicorn app.main:app --host 0.0.0.0 --port 8000
+    volumes:
+      - ./:/app:rw
+    ports:
+      - "8000:8000"
+    environment:
+      # Celery Broker/Backend (point to the redis service)
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/1
+      # Ensure the app uses the local sqlite file (mounted via the repo)
+      - SQLITE_DB_URL=sqlite:///./jobs.db
+      - PYTHONUNBUFFERED=1
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: hospital_worker
+    command: celery -A celery_worker.celery_app worker --pool=solo --loglevel=info
+    volumes:
+      - ./:/app:rw
+    environment:
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/1
+      - SQLITE_DB_URL=sqlite:///./jobs.db
+      - PYTHONUNBUFFERED=1
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  redis_data:
