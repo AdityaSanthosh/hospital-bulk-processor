@@ -171,19 +171,6 @@ curl -H "Idempotency-Key: $(uuidgen)" \
 # Different key = new request (business logic handles data duplicates)
 ```
 
-**Key Generation Examples:**
-```bash
-# UUID (recommended)
-uuidgen  # macOS/Linux
-# Or: python -c "import uuid; print(uuid.uuid4())"
-
-# Timestamp-based
-echo "upload-$(date +%s)-$(openssl rand -hex 4)"
-
-# Semantic
-echo "batch-user123-$(date +%Y%m%d%H%M%S)"
-```
-
 ## 📊 Monitoring
 
 ### Logs
@@ -321,17 +308,6 @@ hospital-bulk-processor/
 ├── requirements.txt
 └── .env.example
 ```
-
-## 🔄 Migration from v1.0
-
-The old code is backed up in `app_old/`. Key changes:
-
-- ✅ FastAPI `BackgroundTasks` → **Celery**
-- ✅ Custom `JobManager` → **Repository pattern**
-- ✅ Direct API calls → **Rate limiting + Circuit breaker + Retry**
-- ✅ No idempotency → **Idempotency keys**
-- ✅ Single file → **Layered architecture**
-- ✅ No versioning → **API v1**
 
 ## 📝 License
 
